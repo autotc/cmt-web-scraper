@@ -61,7 +61,9 @@ export default class ChromePopupBrowser {
 
 	fetchData(url, sitemap, parentSelectorId, callback, scope) {
 		const current_browser = this;
-
+		console.log('fetchData时的parentSelectorId:', parentSelectorId);
+		console.log('fetchData时的sitemap:', JSON.parse(JSON.stringify(sitemap)));
+		console.log('fetchData时的sitemap的Json:', JSON.stringify(sitemap));
 		this._initPopupWindow(function () {
 			const { tab } = current_browser;
 
@@ -71,7 +73,6 @@ export default class ChromePopupBrowser {
 					sitemap: JSON.parse(JSON.stringify(sitemap)),
 					parentSelectorId,
 				};
-
 				browser.tabs.sendMessage(tab.id, message).then(function (data, selectors) {
 					console.log('extracted data from web page', data);
 
@@ -82,6 +83,29 @@ export default class ChromePopupBrowser {
 
 					callback.call(scope, data);
 				});
+			});
+		}, this);
+	}
+
+	// 自定义的抓取数据方法
+	fetchDataSelf(url, sitemap, parentSelectorId, extractCommitUrl, taskId, serverName, platformServer) {
+		const current_browser = this;
+		console.log('fetchData时的parentSelectorId:', parentSelectorId);
+		console.log('fetchData时的sitemap:', JSON.parse(JSON.stringify(sitemap)));
+		console.log('fetchData时的sitemap的Json:', JSON.stringify(sitemap));
+		this._initPopupWindow(function () {
+			const { tab } = current_browser;
+			current_browser.loadUrl(url, function () {
+				const message = {
+					extractDataSelf: true,
+					sitemap: JSON.parse(JSON.stringify(sitemap)),
+					parentSelectorId,
+					extractCommitUrl,
+					taskId,
+					serverName,
+					platformServer,
+				};
+				browser.tabs.sendMessage(tab.id, message).then().catch();
 			});
 		}, this);
 	}

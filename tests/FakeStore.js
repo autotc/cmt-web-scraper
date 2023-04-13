@@ -1,9 +1,9 @@
-var FakeStore = function () {
+const FakeStore = function () {
 	this.data = [];
 };
 
 FakeStore.prototype = {
-	writeDocs: function (data, callback) {
+	writeDocs(data, callback) {
 		data.forEach(
 			function (data) {
 				this.data.push(data);
@@ -12,11 +12,11 @@ FakeStore.prototype = {
 		callback();
 	},
 
-	initSitemapDataDb: function (sitemapId, callback) {
+	initSitemapDataDb(sitemapId, callback) {
 		callback(this);
 	},
 
-	saveSitemap: function (sitemap, callback) {
+	saveSitemap(sitemap, callback) {
 		callback(this);
 	},
 };

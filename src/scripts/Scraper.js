@@ -114,12 +114,12 @@ export default class Scraper {
 	// @TODO remove recursion and add an iterative way to run these jobs.
 	_run() {
 		const job = this.queue.getNextJob();
+		console.log('>>Scraper.js>>_run()>>job:', job);
 		if (job === false) {
 			console.log('Scraper execution is finished');
 			this.executionCallback();
 			return;
 		}
-
 		job.execute(
 			this.browser,
 			function (job) {
@@ -127,6 +127,10 @@ export default class Scraper {
 				const deferredDatamanipulations = [];
 
 				const records = job.getResults();
+				console.log(
+					'>>scraper.js>>_run>>job.execute()回调函数------records:',
+					records
+				);
 				records.forEach(
 					function (record) {
 						// var record = JSON.parse(JSON.stringify(rec));

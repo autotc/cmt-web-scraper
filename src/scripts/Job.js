@@ -63,6 +63,7 @@ export default class Job {
 	}
 
 	execute(popupBrowser, callback, scope) {
+		console.log('----------job.js--------execute--------');
 		const { sitemap } = this.scraper;
 		const job = this;
 		popupBrowser.fetchData(
@@ -70,6 +71,10 @@ export default class Job {
 			sitemap,
 			this.parentSelector,
 			function (results) {
+				console.log(
+					'--------job.js---popupBrowser.fetchData()回调函数返回的-----results:',
+					results
+				);
 				// merge data with data from initialization
 				for (const i in results) {
 					const result = results[i];

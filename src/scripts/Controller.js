@@ -150,6 +150,8 @@ export default class SitemapController {
 				return $.get(`${this.templateDir + templateId}.html`)
 					.promise()
 					.then(template => {
+						// 向ich中添加各个界面的html内容(key,value) key为templateId，value为html内容，
+						// 同时有templateId的属性方法
 						ich.addTemplate(templateId, template);
 					});
 			})
@@ -324,6 +326,7 @@ export default class SitemapController {
 		});
 		if (this.store.supportAuth) {
 			browser.runtime.onMessage.addListener(request => {
+				console.log('--------cointroller.js---listener-------request:', request);
 				if (request.authError || request.authStatusChanged) {
 					$('#confirm-action-modal').remove();
 					$('.modal-backdrop').remove();
@@ -1388,7 +1391,7 @@ export default class SitemapController {
 			});
 		});
 
-		let options = {
+		const options = {
 			id,
 			selector: selectorsSelector,
 			tableHeaderRowSelector,
@@ -1618,6 +1621,7 @@ export default class SitemapController {
 		return true;
 	}
 
+	// 抓取数据的方法
 	scrapeSitemap() {
 		if (!this.isValidForm()) {
 			return false;
@@ -1628,6 +1632,8 @@ export default class SitemapController {
 		const intervalRandomness = $('input[name=requestIntervalRandomness]').val();
 
 		const sitemap = this.state.currentSitemap;
+		console.log('当前的sitemap对象:', sitemap);
+		console.log('当前的sitemap转为json:', JSON.stringify(sitemap));
 		const request = {
 			scrapeSitemap: true,
 			sitemap: JSON.parse(JSON.stringify(sitemap)),
@@ -1635,7 +1641,7 @@ export default class SitemapController {
 			pageLoadDelay,
 			requestIntervalRandomness: intervalRandomness,
 		};
-
+		console.log('发送到background的request:', request);
 		// show sitemap scraping panel
 		this.getFormValidator().destroy();
 		$('.scraping-in-progress').removeClass('hide');
@@ -1646,6 +1652,7 @@ export default class SitemapController {
 			function (selectors) {
 				// table selector can dynamically add columns
 				// replace current selector (columns) with the dynamicly created once
+				// 抓取完成后，返回的selectors
 				sitemap.selectors = new SelectorList(selectors);
 				this.browseSitemapData();
 			}.bind(this)
@@ -1659,6 +1666,7 @@ export default class SitemapController {
 		this.browseSitemapData();
 	}
 
+	// 获取返回数据的地方
 	browseSitemapData() {
 		this.setActiveNavigationButton('sitemap-browse');
 		const sitemap = this.state.currentSitemap;
@@ -2196,6 +2204,50 @@ export default class SitemapController {
 			$dataPreviewPanel.on('hidden.bs.modal', function () {
 				$(this).remove();
 			});
+		});
+	}
+}
+
+class Ajax {
+	constructor(xhr) {
+		xhr = window.XMLHttpRequest ? new XMLHttpRequest() : new ActiveXObject('Microsoft.XMLHTTP');
+		this.xhr = xhr;
+	}
+
+	send(options) {
+		const { xhr } = this;
+
+		const opt = {
+			type: options.type || 'GET',
+			url: options.url || '',
+			async: options.async || 'true',
+			dataType: options.dataType || 'json',
+			questring: options.questring || '',
+		};
+
+		return new Promise((resolve, reject) => {
+			xhr.open(opt.type, opt.url, opt.async);
+
+			xhr.onreadystatechange = () => {
+				if (xhr.readyState === 4) {
+					if (xhr.status === 200) {
+						if (opt.dataType === 'json') {
+							// const data = JSON.parse(xhr.responseText);
+							const data = xhr.responseText;
+							resolve(data);
+							console.log(data);
+						}
+					} else {
+						reject(new Error(xhr.status || 'Server is fail.'));
+					}
+				}
+			};
+			xhr.onerror = () => {
+				reject(new Error(xhr.status || 'Server is fail.'));
+			};
+			// xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+			xhr.setRequestHeader('Content-type', 'application/json;charset-UTF-8');
+			xhr.send(opt.questring);
 		});
 	}
 }

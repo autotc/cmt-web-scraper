@@ -1,4 +1,5 @@
 import * as browser from 'webextension-polyfill';
+import urlJoin from 'url-join';
 import Config from '../scripts/Config';
 import StorePouchDB from '../scripts/StorePouchDB';
 import StoreRestApi from '../scripts/StoreRestApi';
@@ -8,11 +9,15 @@ import Queue from '../scripts/Queue';
 import ChromePopupBrowser from '../scripts/ChromePopupBrowser';
 import Scraper from '../scripts/Scraper';
 import getBackgroundScript from '../scripts/BackgroundScript';
-import urlJoin from 'url-join';
 
 const config = new Config();
 let store;
-
+let webSocket;
+const webSocketUrl = 'ws://localhost:8080/websocket/';
+console.log('进入backgroud.js');
+openSocket();
+// eslint-disable-next-line no-use-before-define
+setInterval(openSocket, 1000 * 60 * 2);
 async function talismanAuthListener(responseDetails) {
 	async function reloadTabs() {
 		const openTabs = await browser.tabs.query({ url: urlJoin(config.talismanApiUrl, '/*') });
@@ -75,7 +80,9 @@ const sendToActiveTab = function (request, callback) {
 		});
 };
 
+// eslint-disable-next-line consistent-return
 browser.runtime.onMessage.addListener(async request => {
+	console.log('--------background.js---listener-------request:', request);
 	if (request.getStandName) {
 		return store.standName;
 	}
@@ -139,10 +146,11 @@ browser.runtime.onMessage.addListener(async request => {
 	if (request.getSitemapData) {
 		return store.getSitemapData(Sitemap.sitemapFromObj(request.sitemap));
 	}
-
+	// 监听抓取事件
 	if (request.scrapeSitemap) {
 		const sitemap = Sitemap.sitemapFromObj(request.sitemap);
 		const queue = new Queue();
+		// 创建弹出页面的实例
 		const browserTab = new ChromePopupBrowser({
 			pageLoadDelay: request.pageLoadDelay,
 		});
@@ -156,10 +164,11 @@ browser.runtime.onMessage.addListener(async request => {
 			requestIntervalRandomness: request.requestIntervalRandomness,
 			pageLoadDelay: request.pageLoadDelay,
 		});
-
+		console.log('执行scraper.run前');
 		return new Promise(resolve => {
 			try {
 				scraper.run(function () {
+					// 数据抓取完成后，关闭弹出的浏览器
 					browserTab.close();
 					browser.notifications.create('scraping-finished', {
 						type: 'basic',
@@ -192,4 +201,106 @@ browser.runtime.onMessage.addListener(async request => {
 			deferredResponse.done(resolve).catch(reject);
 		});
 	}
+	if (request.closeTab) {
+		console.log('收到某页面关闭消息:', request);
+		// eslint-disable-next-line no-use-before-define
+		browserCache.delete(request.browserId);
+		// browserCache[request.browserId] = null;
+		// eslint-disable-next-line no-use-before-define
+		console.log('关闭{}后的browserCache：{}', request.browserId, browserCache);
+	}
 });
+// 用于确定指定的某browser是否存在
+let browserCache = new Map();
+// 开启WebSocket
+function openSocket() {
+	if (typeof WebSocket === 'undefined') {
+		console.log('浏览器不支持WebSocket');
+	} else if (webSocket == null) {
+		// eslint-disable-next-line no-use-before-define
+		const UUID = generateUuid();
+		const socketUrl = webSocketUrl + UUID;
+		webSocket = new WebSocket(socketUrl);
+		webSocket.onopen = function () {
+			console.log('与服务端建立连接');
+			// eslint-disable-next-line no-use-before-define
+			sendSocketMessage(`${UUID}连接服务端`);
+		};
+		webSocket.onmessage = function (msg) {
+			console.log('接收的信息：', msg.data);
+			const task = JSON.parse(msg.data);
+			const { taskId } = task;
+			const { serverName } = task;
+			const { platformServer } = task;
+			const browserId = taskId + platformServer + serverName;
+			// const browserTab = browserCache[browserId];
+			console.log('browserId:', browserId);
+			console.log('browserCache:', browserCache);
+			// 开始抓取数据 已经存在的任务，直接忽视
+			if (task.operType === 'START' && browserCache.get(browserId) == null) {
+				// eslint-disable-next-line no-use-before-define
+				extractData(task);
+			} else if (task.operType === 'STOP') {
+				console.log('进入了Stop：{}', browserCache);
+				// 关闭所有以taskId开始的页面
+				browserCache.forEach((v, k) => {
+					if (k.indexOf(taskId) !== -1) {
+						v.close();
+						browserCache.delete(k);
+					}
+				});
+				// 暂停抓取数据 直接关闭抓取页面
+				// browserCache[browserId] = null;
+				// browserTab.close();
+			}
+		};
+		webSocket.onclose = function () {
+			console.log('WebSocket连接关闭');
+			webSocket = null;
+		};
+		webSocket.onerror = function (error) {
+			console.log('WebSocket报错：', error);
+		};
+	}
+}
+function sendSocketMessage(obj) {
+	webSocket.send(JSON.stringify(obj).toString());
+}
+function extractData(task) {
+	const { taskId } = task;
+	const { extractCommitUrl } = task;
+	const { siteMap } = task;
+	const { serverName } = task;
+	const { platformServer } = task;
+	// 创建弹出页面的实例
+	const browserTab = new ChromePopupBrowser({
+		pageLoadDelay: 2000,
+	});
+	// 缓存页面
+	const browserId = taskId + platformServer + serverName;
+	browserCache.set(browserId, browserTab);
+
+	const sitemap = JSON.parse(siteMap);
+	console.log('解析后的siteMap:', sitemap);
+	const urls = sitemap.startUrls;
+	const parentSelector = sitemap.rootSelector.uuid;
+	urls.forEach(function (url) {
+		browserTab.fetchDataSelf(url, sitemap, parentSelector, extractCommitUrl, taskId, serverName, platformServer);
+	});
+}
+// function stopExtractData() {
+// 	const message = {
+// 		stopExtractData: true,
+// 	};
+// 	browser.tabs.sendMessage(browserTab.tab.id, message);
+// }
+// 生成UUid
+function generateUuid() {
+	return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+		var r = Math.random() * 16 | 0,
+			v = c == 'x' ? r : (r & 0x3 | 0x8);
+		return v.toString(16);
+	});
+}
+
+

@@ -1,7 +1,7 @@
 import axios from 'axios';
+import urlJoin from 'url-join';
 import Sitemap from './Sitemap';
 import StorePouchDB from './StorePouchDB';
-import urlJoin from 'url-join';
 
 export default class StoreRestApi {
 	constructor(config, baseUrl, sitemapsPath = 'sitemaps/') {

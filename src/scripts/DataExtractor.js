@@ -354,19 +354,26 @@ export default class DataExtractor {
 				dataDeferredCalls.push(deferredTreeDataCall);
 			}.bind(this)
 		);
-
+		// console.log('遍历selector得到的dataDeferredCalls:', dataDeferredCalls);
 		const responseDeferred = $.Deferred();
 		$.whenCallSequentially(dataDeferredCalls).done(
 			function (responses) {
+				// console.log(
+				// 	'执行完$.whenCallSequentially(dataDeferredCalls)，的返回：responses:',
+				// 	responses
+				// );
 				let results = [];
 				responses.forEach(function (dataResults) {
 					results = results.concat(dataResults);
 				});
+				// console.log('遍历concat后的数据：results:', results);
 				results.forEach(this.manageAttachments);
+				// console.log('执行manageAttachments后的数据：results:', results);
 				results.forEach(dataObject => {
 					dataObject._url = window.location.href;
 					dataObject._timestamp = Date.now();
 				});
+				// console.log('添加url与timestamp后的：results:', results);
 				responseDeferred.resolve(results);
 			}.bind(this)
 		);

@@ -50,6 +50,7 @@ export default class StorePouchDB {
 	 * @returns {undefined}
 	 */
 	async initSitemapDataDb(sitemapId) {
+		console.log('---------initSitemapDataDb------------');
 		const store = this;
 		let db = this.getSitemapDataDb(sitemapId);
 		try {
